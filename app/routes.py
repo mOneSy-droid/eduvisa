@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app import models, schemas
+from app.auth import verify_api_key
 from app.telegram import (
     send_new_lead_notification,
     send_new_booking_notification,
@@ -41,12 +42,12 @@ async def create_lead(lead_in: schemas.LeadCreate, db: Session = Depends(get_db)
     return db_lead
 
 
-@router.get("/leads/", response_model=List[schemas.LeadResponse])
+@router.get("/leads/", response_model=List[schemas.LeadResponse], dependencies=[Depends(verify_api_key)])
 def list_leads(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return db.query(models.Lead).order_by(models.Lead.created_at.desc()).offset(skip).limit(limit).all()
 
 
-@router.get("/leads/{lead_id}", response_model=schemas.LeadResponse)
+@router.get("/leads/{lead_id}", response_model=schemas.LeadResponse, dependencies=[Depends(verify_api_key)])
 def get_lead(lead_id: int, db: Session = Depends(get_db)):
     lead = db.query(models.Lead).filter(models.Lead.id == lead_id).first()
     if not lead:
@@ -81,7 +82,7 @@ async def create_booking(booking_in: schemas.BookingCreate, db: Session = Depend
     return db_booking
 
 
-@router.get("/bookings/", response_model=List[schemas.BookingResponse])
+@router.get("/bookings/", response_model=List[schemas.BookingResponse], dependencies=[Depends(verify_api_key)])
 def list_bookings(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return db.query(models.Booking).order_by(models.Booking.created_at.desc()).offset(skip).limit(limit).all()
 
@@ -142,12 +143,12 @@ async def create_application(
     return db_app
 
 
-@router.get("/applications/", response_model=List[schemas.ApplicationResponse])
+@router.get("/applications/", response_model=List[schemas.ApplicationResponse], dependencies=[Depends(verify_api_key)])
 def list_applications(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return db.query(models.Application).order_by(models.Application.created_at.desc()).offset(skip).limit(limit).all()
 
 
-@router.get("/applications/{app_id}", response_model=schemas.ApplicationResponse)
+@router.get("/applications/{app_id}", response_model=schemas.ApplicationResponse, dependencies=[Depends(verify_api_key)])
 def get_application(app_id: int, db: Session = Depends(get_db)):
     app = db.query(models.Application).filter(models.Application.id == app_id).first()
     if not app:
@@ -155,7 +156,7 @@ def get_application(app_id: int, db: Session = Depends(get_db)):
     return app
 
 
-@router.get("/applications/{app_id}/files/{file_id}")
+@router.get("/applications/{app_id}/files/{file_id}", dependencies=[Depends(verify_api_key)])
 def download_file(app_id: int, file_id: int, db: Session = Depends(get_db)):
     f = db.query(models.ApplicationFile).filter(
         models.ApplicationFile.id == file_id,
