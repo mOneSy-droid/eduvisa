@@ -18,6 +18,11 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def _apply_update(db_obj, data: dict):
+    for key, value in data.items():
+        setattr(db_obj, key, value)
+
+
 # ─── Leads ───────────────────────────────────────────────────────────────────
 
 @router.post("/leads/", response_model=schemas.LeadResponse, status_code=201)
@@ -169,3 +174,162 @@ def download_file(app_id: int, file_id: int, db: Session = Depends(get_db)):
         media_type=f.content_type or "application/octet-stream",
         headers={"Content-Disposition": f'attachment; filename="{f.filename}"'},
     )
+
+
+# ─── Partners (hamkorlar / akkreditatsiya) ────────────────────────────────────
+
+@router.get("/partners/", response_model=List[schemas.PartnerResponse])
+def list_partners_public(category: Optional[str] = None, db: Session = Depends(get_db)):
+    q = db.query(models.Partner).filter(models.Partner.is_active.is_(True))
+    if category:
+        q = q.filter(models.Partner.category == category)
+    return q.order_by(models.Partner.order.asc(), models.Partner.id.asc()).all()
+
+
+@router.get("/partners/admin", response_model=List[schemas.PartnerResponse], dependencies=[Depends(verify_api_key)])
+def list_partners_admin(db: Session = Depends(get_db)):
+    return db.query(models.Partner).order_by(models.Partner.order.asc(), models.Partner.id.asc()).all()
+
+
+@router.post("/partners/", response_model=schemas.PartnerResponse, status_code=201, dependencies=[Depends(verify_api_key)])
+def create_partner(data: schemas.PartnerCreate, db: Session = Depends(get_db)):
+    db_partner = models.Partner(**data.model_dump())
+    db.add(db_partner)
+    db.commit()
+    db.refresh(db_partner)
+    return db_partner
+
+
+@router.put("/partners/{partner_id}", response_model=schemas.PartnerResponse, dependencies=[Depends(verify_api_key)])
+def update_partner(partner_id: int, data: schemas.PartnerUpdate, db: Session = Depends(get_db)):
+    db_partner = db.query(models.Partner).filter(models.Partner.id == partner_id).first()
+    if not db_partner:
+        raise HTTPException(404, "Hamkor topilmadi")
+    _apply_update(db_partner, data.model_dump(exclude_unset=True))
+    db.commit()
+    db.refresh(db_partner)
+    return db_partner
+
+
+@router.delete("/partners/{partner_id}", status_code=204, dependencies=[Depends(verify_api_key)])
+def delete_partner(partner_id: int, db: Session = Depends(get_db)):
+    db_partner = db.query(models.Partner).filter(models.Partner.id == partner_id).first()
+    if not db_partner:
+        raise HTTPException(404, "Hamkor topilmadi")
+    db.delete(db_partner)
+    db.commit()
+    return Response(status_code=204)
+
+
+# ─── News (yangiliklar) ────────────────────────────────────────────────────────
+
+@router.get("/news/", response_model=List[schemas.NewsResponse])
+def list_news_public(limit: int = 20, db: Session = Depends(get_db)):
+    return (
+        db.query(models.News)
+        .filter(models.News.is_published.is_(True))
+        .order_by(models.News.published_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+
+@router.get("/news/admin", response_model=List[schemas.NewsResponse], dependencies=[Depends(verify_api_key)])
+def list_news_admin(db: Session = Depends(get_db)):
+    return db.query(models.News).order_by(models.News.published_at.desc()).all()
+
+
+@router.get("/news/{slug}", response_model=schemas.NewsResponse)
+def get_news_by_slug(slug: str, db: Session = Depends(get_db)):
+    item = db.query(models.News).filter(
+        models.News.slug == slug, models.News.is_published.is_(True)
+    ).first()
+    if not item:
+        raise HTTPException(404, "Yangilik topilmadi")
+    return item
+
+
+@router.post("/news/", response_model=schemas.NewsResponse, status_code=201, dependencies=[Depends(verify_api_key)])
+def create_news(data: schemas.NewsCreate, db: Session = Depends(get_db)):
+    if db.query(models.News).filter(models.News.slug == data.slug).first():
+        raise HTTPException(409, "Bu slug allaqachon band")
+    db_news = models.News(**data.model_dump())
+    db.add(db_news)
+    db.commit()
+    db.refresh(db_news)
+    return db_news
+
+
+@router.put("/news/{news_id}", response_model=schemas.NewsResponse, dependencies=[Depends(verify_api_key)])
+def update_news(news_id: int, data: schemas.NewsUpdate, db: Session = Depends(get_db)):
+    db_news = db.query(models.News).filter(models.News.id == news_id).first()
+    if not db_news:
+        raise HTTPException(404, "Yangilik topilmadi")
+    update_data = data.model_dump(exclude_unset=True)
+    if "slug" in update_data:
+        existing = db.query(models.News).filter(
+            models.News.slug == update_data["slug"], models.News.id != news_id
+        ).first()
+        if existing:
+            raise HTTPException(409, "Bu slug allaqachon band")
+    _apply_update(db_news, update_data)
+    db.commit()
+    db.refresh(db_news)
+    return db_news
+
+
+@router.delete("/news/{news_id}", status_code=204, dependencies=[Depends(verify_api_key)])
+def delete_news(news_id: int, db: Session = Depends(get_db)):
+    db_news = db.query(models.News).filter(models.News.id == news_id).first()
+    if not db_news:
+        raise HTTPException(404, "Yangilik topilmadi")
+    db.delete(db_news)
+    db.commit()
+    return Response(status_code=204)
+
+
+# ─── Banner (aylanuvchi banner) ────────────────────────────────────────────────
+
+@router.get("/banners/", response_model=List[schemas.BannerResponse])
+def list_banners_public(db: Session = Depends(get_db)):
+    return (
+        db.query(models.Banner)
+        .filter(models.Banner.is_active.is_(True))
+        .order_by(models.Banner.order.asc(), models.Banner.id.asc())
+        .all()
+    )
+
+
+@router.get("/banners/admin", response_model=List[schemas.BannerResponse], dependencies=[Depends(verify_api_key)])
+def list_banners_admin(db: Session = Depends(get_db)):
+    return db.query(models.Banner).order_by(models.Banner.order.asc(), models.Banner.id.asc()).all()
+
+
+@router.post("/banners/", response_model=schemas.BannerResponse, status_code=201, dependencies=[Depends(verify_api_key)])
+def create_banner(data: schemas.BannerCreate, db: Session = Depends(get_db)):
+    db_banner = models.Banner(**data.model_dump())
+    db.add(db_banner)
+    db.commit()
+    db.refresh(db_banner)
+    return db_banner
+
+
+@router.put("/banners/{banner_id}", response_model=schemas.BannerResponse, dependencies=[Depends(verify_api_key)])
+def update_banner(banner_id: int, data: schemas.BannerUpdate, db: Session = Depends(get_db)):
+    db_banner = db.query(models.Banner).filter(models.Banner.id == banner_id).first()
+    if not db_banner:
+        raise HTTPException(404, "Banner topilmadi")
+    _apply_update(db_banner, data.model_dump(exclude_unset=True))
+    db.commit()
+    db.refresh(db_banner)
+    return db_banner
+
+
+@router.delete("/banners/{banner_id}", status_code=204, dependencies=[Depends(verify_api_key)])
+def delete_banner(banner_id: int, db: Session = Depends(get_db)):
+    db_banner = db.query(models.Banner).filter(models.Banner.id == banner_id).first()
+    if not db_banner:
+        raise HTTPException(404, "Banner topilmadi")
+    db.delete(db_banner)
+    db.commit()
+    return Response(status_code=204)

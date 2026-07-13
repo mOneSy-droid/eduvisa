@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Enum, LargeBinary
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Enum, LargeBinary
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -63,3 +63,40 @@ class ApplicationFile(Base):
     data = Column(LargeBinary, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     application = relationship("Application", back_populates="files")
+
+
+class Partner(Base):
+    __tablename__ = "partners"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(150), nullable=False)
+    logo_url = Column(String(500), nullable=False)
+    website_url = Column(String(500), nullable=True)
+    category = Column(String(50), nullable=False, default="accreditation")
+    order = Column(Integer, nullable=False, default=0)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class News(Base):
+    __tablename__ = "news"
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(255), nullable=False)
+    slug = Column(String(255), nullable=False, unique=True, index=True)
+    excerpt = Column(Text, nullable=True)
+    content = Column(Text, nullable=True)
+    image_url = Column(String(500), nullable=True)
+    is_published = Column(Boolean, nullable=False, default=True)
+    published_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class Banner(Base):
+    __tablename__ = "banners"
+    id = Column(Integer, primary_key=True, index=True)
+    text = Column(String(500), nullable=False)
+    highlight = Column(String(255), nullable=True)
+    link_url = Column(String(500), nullable=True)
+    link_label = Column(String(100), nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    order = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
