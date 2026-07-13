@@ -100,3 +100,12 @@ class Banner(Base):
     is_active = Column(Boolean, nullable=False, default=True)
     order = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class Upload(Base):
+    __tablename__ = "uploads"
+    id = Column(Integer, primary_key=True, index=True)
+    filename = Column(String(255), nullable=False)
+    content_type = Column(String(100), nullable=True)
+    data = Column(LargeBinary, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

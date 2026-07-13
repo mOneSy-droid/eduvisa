@@ -175,3 +175,15 @@ class BannerResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ─── Uploads (admin panelidan rasm yuklash) ────────────────────────────────────
+
+class UploadResponse(BaseModel):
+    id: int
+    filename: str
+    content_type: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

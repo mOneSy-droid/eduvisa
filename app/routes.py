@@ -333,3 +333,37 @@ def delete_banner(banner_id: int, db: Session = Depends(get_db)):
     db.delete(db_banner)
     db.commit()
     return Response(status_code=204)
+
+
+# ─── Uploads (admin panelidan rasm yuklash) ────────────────────────────────────
+
+MAX_UPLOAD_SIZE = 5 * 1024 * 1024  # 5 MB
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"}
+
+
+@router.post("/uploads/", response_model=schemas.UploadResponse, status_code=201, dependencies=[Depends(verify_api_key)])
+async def create_upload(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(400, "Faqat rasm fayllari qabul qilinadi (jpeg, png, webp, gif, svg)")
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, "Bo'sh fayl")
+    if len(content) > MAX_UPLOAD_SIZE:
+        raise HTTPException(413, "Fayl hajmi 5 MB dan oshmasligi kerak")
+    db_upload = models.Upload(
+        filename=file.filename or "upload",
+        content_type=file.content_type,
+        data=content,
+    )
+    db.add(db_upload)
+    db.commit()
+    db.refresh(db_upload)
+    return db_upload
+
+
+@router.get("/uploads/{upload_id}")
+def get_upload(upload_id: int, db: Session = Depends(get_db)):
+    u = db.query(models.Upload).filter(models.Upload.id == upload_id).first()
+    if not u:
+        raise HTTPException(404, "Fayl topilmadi")
+    return Response(content=u.data, media_type=u.content_type or "application/octet-stream")
